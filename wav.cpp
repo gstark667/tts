@@ -1,3 +1,4 @@
+#include <SD.h>
 #include "wav.h"
 
 const char *c_riff = "RIFF";
