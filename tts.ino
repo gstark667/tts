@@ -27,6 +27,7 @@ AudioControlSGTL5000     sgtl5000_1;     //xy=476.8833312988281,714.883331298828
 // GUItool: end automatically generated code
 
 IntervalTimer clk;
+bool running;
 
 #define AUDIO_MEMORY 8
 
@@ -46,7 +47,9 @@ const int ledPin = 13;
 
 uint16_t *samples[4] = {NULL, NULL, NULL, NULL};
 
-static int16_t sequences[4][16] = {
+int16_t **sequences;
+
+static int16_t example_data[4][16] = {
   { 0, -1, -1, -1,  0, -1, -1, -1,  0, -1, -1, -1,  0, -1, -1,  0},
   {-1, -1,  1, -1, -1, -1,  1,  1, -1, -1,  1, -1, -1,  1,  1,  1},
   {-1,  3, -1,  3,  2,  3, -1,  3, -1,  3, -1,  3,  2,  3, -1,  3},
@@ -82,37 +85,65 @@ int strncmp(char *a, char *b, int len)
   return 0;
 }
 
+void play()
+{
+  clk.begin(processTrigger, 200000);
+  running = true;
+}
+
+void pause()
+{
+  clk.end();
+  running = false;
+}
+
+void stop()
+{
+  clk.end();
+  running = false;
+  for (int i = 0; i < n_samplers; ++i)
+  {
+    sequence_poses[i] = 0;
+  }
+}
+
 void handleKeypad()
 {
   int color = ui_color;
   if (keypad.getKeys())
   {
+    int idx = keypad.findInList('*');
+    if (idx > -1 && keypad.key[i].kstate == PRESSED || keypad.key[i].kstate == HOLD)
+    {
+      cur->shift(true);
+    }
+    else
+    {
+      cur->shift(false);
+    }
+    
     for (int i = 0; i < 10; ++i)
     {
       if (keypad.key[i].stateChanged && (keypad.key[i].kstate == PRESSED))
       {
         switch (keypad.key[i].kchar)
         {
-        case '#':
-          clk.end();
+        case '3':
+          play();
           break;
-        case '*':
-          clk.begin(processTrigger, 200000);
+        case '9':
+          pause();
           break;
         case '6':
-          cursor_y--;
           cur->up();
           break;
         case '4':
-          cursor_y++;
           cur->down();
           break;
         case '2':
-          cursor_x--;
           cur->left();
           break;
         case '8':
-          cursor_x++;
           cur->right();
           break;
         }
@@ -126,30 +157,23 @@ void setup()
   // setup tft display
   tft.begin();
 
-  int16_t **seqs = malloc(sizeof(int16_t) * 4);
+  sequences = malloc(sizeof(int16_t) * 4);
   for (int i = 0; i < 4; ++i)
   {
-    seqs[i] = malloc(sizeof(int16_t) * 16);
+    sequences[i] = malloc(sizeof(int16_t) * 16);
     for (int j = 0; j < 16; ++j)
     {
-      seqs[i][j] = sequences[i][j];
+      sequences[i][j] = example_data[i][j];
     }
   }
 
-  cur = new Pattern(seqs, sequence_lengths, sequence_poses, n_samplers);
+  cur = new Pattern(sequences, sequence_lengths, sequence_poses, n_samplers);
   cur->init();
-
-  cursor_x = 0;
-  cursor_y = 0;
 
   AudioMemory(AUDIO_MEMORY);
   AudioNoInterrupts();
   sgtl5000_1.enable();
   sgtl5000_1.volume(0.0);
-
-  //playSdWav1.frequency(28);
-  clk.begin(processTrigger, 200000);
-  //crash.begin(playCrash, 1200000);
 
   mixer1.gain(0, 0.50);
   mixer1.gain(1, 0.50);
@@ -170,10 +194,6 @@ void setup()
   for (int s = 0; s < n_samplers; ++s)
   {
     sprintf(sampler_names[s], "Sampler %d", s+1);
-    for (int i = 0; i < sequence_lengths[s]; ++i)
-    {
-      sequences[s][i] = random(-1, 4);
-    }
   }
 
   AudioInterrupts();
@@ -185,27 +205,9 @@ void loop()
   float vol = (float)knob / 1030.0;
   sgtl5000_1.volume(vol);
 
-  //tft.fillScreen(ILI9341_BLACK);
-  //tft.fillRect(0, 0, 48, 14, ILI9341_BLACK);
-  /*tft.setTextColor(ui_color, bg_color);
-  tft.setCursor(tft.width() - ui_padding - 4 * ui_text_width, 0);
-  tft.print(AudioProcessorUsage());
-  tft.setCursor(128, 0);
-  tft.print(cursor_x);
-  tft.print(",");
-  tft.print(cursor_y);*/
-
   handleKeypad();
   
-  cur->draw();
-  /*char key = keypad.getKey();
-  if (key != NO_KEY) {
-    //tft.fillRect(0, 16, 12, 14, ILI9341_BLACK);
-    tft.setCursor(0, 16);
-    tft.println(key);
-  }*/
-
-  //delay(150);
+  cur->draw(running);
 }
 
 void processTrigger()
@@ -215,7 +217,6 @@ void processTrigger()
 
   int sample = -1;
   for (int s = 0; s < n_samplers; ++s)
-  //for (int s = 0; s < 1; ++s)
   {
     sample = sequences[s][sequence_poses[s]];
     if (sample > -1)
