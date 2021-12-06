@@ -11,16 +11,8 @@
 #include "pattern.h"
 
 // GUItool: begin automatically generated code
-Sampler                  playMem4; //xy=103.88333129882812,522.88330078125
-Sampler                  playMem1;       //xy=114.88333129882812,323.8833312988281
-Sampler                  playMem3; //xy=115.88333129882812,453.8833312988281
-Sampler                  playMem2;  //xy=118.88333129882812,388.8833312988281
 AudioMixer4              mixer1;         //xy=443.8833312988281,421.8833312988281
 AudioOutputI2S           i2s1;           //xy=729.88330078125,456.8833312988281
-AudioConnection          patchCord1(playMem4, 0, mixer1, 3);
-AudioConnection          patchCord2(playMem1, 0, mixer1, 0);
-AudioConnection          patchCord3(playMem3, 0, mixer1, 2);
-AudioConnection          patchCord4(playMem2, 0, mixer1, 1);
 AudioConnection          patchCord5(mixer1, 0, i2s1, 0);
 AudioConnection          patchCord6(mixer1, 0, i2s1, 1);
 AudioControlSGTL5000     sgtl5000_1;     //xy=476.8833312988281,714.8833312988281
@@ -50,9 +42,9 @@ uint16_t *samples[4] = {NULL, NULL, NULL, NULL};
 int16_t **sequences;
 
 static int16_t example_data[4][16] = {
-  { 0, -1, -1, -1,  0, -1, -1, -1,  0, -1, -1, -1,  0, -1, -1,  0},
-  {-1, -1,  1, -1, -1, -1,  1,  1, -1, -1,  1, -1, -1,  1,  1,  1},
-  {-1,  3, -1,  3,  2,  3, -1,  3, -1,  3, -1,  3,  2,  3, -1,  3},
+  { 0, -1,  1, -1,  0, -1,  1, -1,  0, -1,  1, -1,  0, -1,  1, -1},
+  {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+  {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
   {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 };
 static uint16_t sequence_lengths[4] = {
@@ -64,9 +56,8 @@ static uint16_t sequence_poses[4] = {
 
 const int max_name = 16;
 const uint16_t n_samplers = 4;
-Sampler *samplers[n_samplers] = {
-  &playMem1, &playMem2, &playMem3, &playMem4
-};
+Sampler **samplers;
+AudioConnection **connections;
 char sampler_names[n_samplers][max_name];
 
 Widget *cur;
@@ -170,15 +161,20 @@ void setup()
   cur = new Pattern(sequences, sequence_lengths, sequence_poses, n_samplers);
   cur->init();
 
+  // setup pipeline
+  connections = malloc(sizeof(AudioConnection*) * n_samplers);
+  samplers = malloc(sizeof(Sampler*) * n_samplers);
+  for (int i = 0; i < n_samplers; ++i)
+  {
+    samplers[i] = new Sampler();
+    connections[i] = new AudioConnection(*samplers[i], 0, mixer1, i);
+    mixer1.gain(i, 0.25);
+  }
+
   AudioMemory(AUDIO_MEMORY);
   AudioNoInterrupts();
   sgtl5000_1.enable();
   sgtl5000_1.volume(0.0);
-
-  mixer1.gain(0, 0.50);
-  mixer1.gain(1, 0.50);
-  mixer1.gain(2, 0.15);
-  mixer1.gain(3, 0.15);
 
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW);
